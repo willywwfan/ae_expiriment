@@ -10,6 +10,7 @@ from cmath import inf
 import glob, os
 import numpy as np
 import cv2
+import random
 
 class CameraSimulator:
     def __init__(self, path):
@@ -85,6 +86,11 @@ class AutoExposure:
 
         return self.get_exposure()
 
+def vis_img(name, img):
+    #4096 * 2048
+    img = cv2.resize(img, (1024, 512), interpolation=cv2.INTER_AREA)
+    cv2.imshow(name, img)
+
 def main():
     path = os.path.join("images","144550", "*")
     cam = CameraSimulator(path)
@@ -97,17 +103,20 @@ def main():
     cnt = 0
     ev = initial_ev
     while True:
-        print(ev)
         image = cam.capture()
-        next_ev = ae.run(image)
-        cam.set(next_ev)
+        vis_img("current_img", image)
+        ev = ae.run(image)
+        cam.set(ev)
+        print(ev)
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
+        if key == ord('i'):
+            initial_ev = random.uniform(-1.5, 1.5)
+            cam.set(initial_ev)
+            ae.cerrent_ev = initial_ev
 
-        if ev == next_ev:
-            cnt += 1
-            if cnt == 10:break
-        else:cnt = 1
-
-        ev = next_ev
+    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
