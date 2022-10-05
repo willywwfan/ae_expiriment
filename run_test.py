@@ -10,16 +10,13 @@ from cmath import inf
 import glob, os
 import numpy as np
 import cv2
-import sys
 
-class AutoExposure:
+class CameraSimulator:
     def __init__(self, path):
-        # I term for PI controller
-        self.err_i = 0
         self.data_dict = self.load_data_dic(path)
-        self.cerrent_ev = -1.47
+        self.cerrent_ev = 0
         self.current_image = self.data_dict[self.cerrent_ev]
-    
+
     def load_data_dic(self, img_path):
         files = glob.glob(img_path)
         data_dic = {}
@@ -33,23 +30,27 @@ class AutoExposure:
                 data_dic[ev] = image
         return data_dic
 
-    def get_exposure(self):
-        return self.cerrent_ev
-    
-    def get_img(self):
-        return self.current_image
-    
-    def num2ev(self,num):
+    def num2ev(self, num):
         return round(round(num/0.03)*0.03, 2)
 
-    def set_situation(self, new_ev):
+    def set(self, new_ev):
         new_ev = self.num2ev(new_ev)
         self.cerrent_ev = new_ev
-        print(self.cerrent_ev)
         self.current_image = self.data_dict[self.cerrent_ev]
+    
+    def capture(self):
+        return self.current_image
 
-    def image_callback(self):
-        cv_image = self.get_img()
+class AutoExposure:
+    def __init__(self):
+        # I term for PI controller
+        self.err_i = 0
+        self.cerrent_ev = 0
+
+    def get_exposure(self):
+        return self.cerrent_ev
+
+    def run(self, cv_image):
         (rows, cols, channels) = cv_image.shape
 
         if (channels == 3):
@@ -79,23 +80,34 @@ class AutoExposure:
         # Don't change exposure if we're close enough. Changing too often slows
         # down the data rate of the camera.
         if abs(err_p) > 0.5:
-            add_value = float(k_p*err_p+k_i*self.err_i)
-            self.set_situation(self.cerrent_ev + add_value)
+            add_value = float(k_p*err_p+k_i*self.err_i) #ndarray to float
+            self.cerrent_ev += add_value
+
+        return self.get_exposure()
 
 def main():
     path = os.path.join("images","144550", "*")
-    ae = AutoExposure(path)
+    cam = CameraSimulator(path)
+    ae = AutoExposure()
+
+    initial_ev = 1.3
+    cam.set(initial_ev)
+    ae.cerrent_ev = initial_ev
+
     cnt = 0
+    ev = initial_ev
     while True:
-        print(ae.get_exposure())
-        ev = ae.get_exposure()
-        ae.image_callback()
-        
-        if ev == ae.get_exposure():
+        print(ev)
+        image = cam.capture()
+        next_ev = ae.run(image)
+        cam.set(next_ev)
+
+        if ev == next_ev:
             cnt += 1
-            if cnt == 10:
-                break
-        else:
-            cnt = 1
+            if cnt == 10:break
+        else:cnt = 1
+
+        ev = next_ev
+
 if __name__ == "__main__":
     main()
